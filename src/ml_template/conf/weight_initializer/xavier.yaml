@@ -1,0 +1,2 @@
+_target_: skeletal_muscle.models.initializers.XavierInitializer
+seed: ${experiment.seed}

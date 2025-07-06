@@ -1,0 +1,10 @@
+scheduler:
+    _target_: torch.optim.lr_scheduler.LinearLR
+    start_factor: 1.0
+    end_factor: 0.01 # e.g., end at 1% of the initial LR
+    total_iters: ${trainer.max_epochs}
+    verbose: False
+
+monitor: 'val/loss'
+interval: 'epoch'
+frequency: 1

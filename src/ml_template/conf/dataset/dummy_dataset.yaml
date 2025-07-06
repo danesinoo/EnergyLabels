@@ -1,0 +1,3 @@
+_target_: ml_template.data.components.DummyDtst
+sample_size: [3, 9, 9]
+dataset_size: 10

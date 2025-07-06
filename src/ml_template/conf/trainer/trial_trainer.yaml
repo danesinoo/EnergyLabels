@@ -1,0 +1,31 @@
+defaults:
+    - /logger: wandb
+    - _self_
+
+callbacks:
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: 'val/epoch_acc'
+      mode: 'max'
+      save_top_k: 1
+      filename: 'best-acc-{epoch:02d}'
+      dirpath: ${hydra:runtime.output_dir}/checkpoints
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: 'val/epoch_rec'
+      mode: 'max'
+      save_top_k: 1
+      filename: 'best-rec-{epoch:02d}'
+      dirpath: ${hydra:runtime.output_dir}/checkpoints
+    - _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      monitor: 'val/epoch_prec'
+      mode: 'max'
+      save_top_k: 1
+      filename: 'best-prec-{epoch:02d}'
+      dirpath: ${hydra:runtime.output_dir}/checkpoints
+_target_: lightning.pytorch.Trainer
+max_epochs: 2
+accelerator: 'auto'
+devices: 1
+precision: '16-mixed'
+num_sanity_val_steps: 0
+default_root_dir: '.'
+fast_dev_run: false
