@@ -1,7 +1,0 @@
-lightning
-hydra-core
-pandas
-matplotlib
-seaborn
-ipykernel
-numpy

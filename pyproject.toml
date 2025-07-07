@@ -4,4 +4,14 @@ version = "0.1.0"
 description = "Fine-tune a pre-trained model for information extraction"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "ipywidgets>=8.1.7",
+    "jupyterlab>=4.4.4",
+    "matplotlib>=3.10.3",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.0",
+    "scikit-learn>=1.7.0",
+    "seaborn>=0.13.2",
+    "torch>=2.7.1",
+    "tqdm>=4.67.1",
+]
