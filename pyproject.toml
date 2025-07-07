@@ -1,7 +1,7 @@
 [project]
-name = "4b-consulting"
+name = "EnergyLabels"
 version = "0.1.0"
-description = "Add your description here"
+description = "Fine-tune a pre-trained model for information extraction"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = []
