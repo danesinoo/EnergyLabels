@@ -1,15 +1,13 @@
 from llama_cpp import Llama, LlamaGrammar
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 import json
 
 
-class Query(BaseModel):
-    text: str
+class Query:
+    def __init__(self, text):
+        self.text = text
 
 
-class chatbot_extracter:
+class chatbot:
     def __init__(self, model_path, context_size, n_threads, message_layout, grammar):
         self.m_layout = message_layout
         self.grammar = LlamaGrammar.from_string(grammar)
@@ -27,25 +25,28 @@ class chatbot_extracter:
                 prompt, temperature=0, max_tokens=128, grammar=self.grammar, stop=["}"]
             )
             json_str = response["choices"][0]["text"] + "}"
-            return JSONResponse(json.loads(json_str))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            return json.loads(json_str)
+        except Exception as _:
+            raise "Error on sample " + query.text
+
 
 if __name__ == "__main__":
-    import uvicorn
+    from tqdm import trange
+    import pandas as pd
+    from data_from_xlsx import to_csv
+    import asyncio
 
     # Configuration
     MODEL_PATH = "models/Qwen3-0.6B-Q5_K_M.gguf"  # Path to your GGUF file
     N_CTX = 2048  # Context window size
     N_THREADS = 8  # CPU threads
 
-
     def build_prompt(text):
         return f"""
         Example 1:
-        Input: "Fjernvarme med isoleret veksler (indirekte anlæg) - nyere. 
-        Bygningen opvarmes med fjernvarme. 
-        Anlægget er udført med isoleret varmeveksler og indirekte centralvarmevand i fordelingsnettet. 
+        Input: "Fjernvarme med isoleret veksler (indirekte anlæg) - nyere.
+        Bygningen opvarmes med fjernvarme.
+        Anlægget er udført med isoleret varmeveksler og indirekte centralvarmevand i fordelingsnettet.
         Anlægget er opstillet i Badensgade 41."
         Output: {{
             "Pieces": 1,
@@ -70,7 +71,7 @@ if __name__ == "__main__":
         }}
 
         Example 3:
-        Input: "Fjv. Installation efter 1980 (isoleret). Ejendommen opvarmes med indirekte fjernvarme. 
+        Input: "Fjv. Installation efter 1980 (isoleret). Ejendommen opvarmes med indirekte fjernvarme.
     Bygningen opvarmes med fjernvarme med veksler.
     Veksleren er af fabrikat WPH, type SL70TL-1-90CC fra 2008 og vurderes isoleret med 40 mm PUR.
     Jf. tidligere energimærkerapport er der brændeovne i de enkelte boliger.
@@ -110,7 +111,6 @@ if __name__ == "__main__":
         Output:
         """
 
-
     GRAMMAR = r"""
     root ::= "{" p "," m "," s "," h "," n "," y "}"
     p ::= "\"Pieces\": " (number | "null")
@@ -122,17 +122,35 @@ if __name__ == "__main__":
     y ::= "\"Year\": " ("null" | "\"" [a-zA-Z0-9æøåÆØÅ ]+ "\"" | [0-9]{4})
     """
 
-    app = FastAPI()
+    chatbot = chatbot(MODEL_PATH, N_CTX, N_THREADS, build_prompt, GRAMMAR)
+    df = pd.read_csv("data/gt.csv")
+    df.rename(
+        columns={
+            "Pieces1": "Pieces",
+            "Manufacturer1": "Manufacturer",
+            "SubType1": "SubType",
+            "HxType1": "HxType",
+            "NominelEffectEach1": "NominalEffectEach",
+            "Year1": "Year",
+        },
+        inplace=True,
+    )
 
-    ce = chatbot_extracter(MODEL_PATH, N_CTX, N_THREADS, build_prompt, GRAMMAR)
+    res = []
+    errors = []
 
-
-    @app.post("/extract")
-    async def extract_heating_data(query: Query):
+    pbar = trange(len(df), desc="Chatbot")
+    for i in pbar:
+        line = str(df.loc[i, "S_text"]) + ". " + str(df.loc[i, "L_text"])
+        query = Query(line)
         try:
-            return await ce.extract_heating_data(query)
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            pred = asyncio.run(chatbot.extract_heating_data(query))
+            pred["S_text"] = df.loc[i, "S_text"]
+            pred["L_text"] = df.loc[i, "L_text"]
+        except Exception as _:
+            pbar.set_postfix("error with entry: ", i)
+            errors.append(i)
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    res_dataframe = pd.DataFrame(res)
+
+    to_csv(res_dataframe, "chatbot_predictions")
