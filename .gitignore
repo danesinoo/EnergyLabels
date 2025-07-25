@@ -188,4 +188,5 @@ wandb
 
 outputs/*
 models/*
+!models/README.md
 !outputs/.gitkeep
