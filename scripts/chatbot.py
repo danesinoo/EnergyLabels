@@ -7,10 +7,12 @@ class Query:
         self.text = text
 
 
-class chatbot:
-    def __init__(self, model_path, context_size, n_threads, message_layout, grammar):
+class Chatbot:
+    def __init__(
+        self, model_path, context_size, n_threads, message_layout=None, grammar=None
+    ):
         self.m_layout = message_layout
-        self.grammar = LlamaGrammar.from_string(grammar)
+        self.grammar = LlamaGrammar.from_string(grammar) if grammar else None
         self.llm = Llama(
             model_path=model_path,
             n_ctx=context_size,
@@ -18,14 +20,18 @@ class chatbot:
             verbose=False,
         )
 
+    async def prompt(self, text, max_tokens=100, stop=["}"]):
+        try:
+            response = self.llm(text, temperature=0, max_tokens=max_tokens, stop=stop)
+            return response["choices"][0]["text"].strip()
+        except Exception as _:
+            raise "Error on sample " + text
+
     async def extract_heating_data(self, query: Query):
         try:
             prompt = self.m_layout(query.text)
-            response = self.llm(
-                prompt, temperature=0, max_tokens=128, grammar=self.grammar, stop=["}"]
-            )
-            json_str = response["choices"][0]["text"] + "}"
-            return json.loads(json_str)
+            response = self.llm(prompt, temperature=0, max_tokens=100, stop=["}"])
+            return response["choices"][0]["text"].strip()
         except Exception as _:
             raise "Error on sample " + query.text
 

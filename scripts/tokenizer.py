@@ -13,8 +13,35 @@ class Tokenizer:
         self.model.eval()
 
     def tokenize(self, text):
-        # Tokenize text and get necessary mappings
-        inputs = self.tokenizer(
+        """
+        Tokenize text and return words, their embeddings, and indices.
+
+        Args:
+            text (str): Input text to tokenize
+
+        Returns:
+            tuple: (words, embeddings, indices) where:
+                - words: List of word strings
+                - embeddings: List of averaged token embeddings for each word
+                - indices: List of (start, end) character indices for each word
+        """
+        # Get tokenized inputs and model outputs
+        inputs = self._prepare_inputs(text)
+        last_hidden_states = self._get_hidden_states(inputs["input_ids"])
+
+        # Extract word information
+        word_groups = self._group_tokens_by_word(
+            inputs["offset_mapping"][0], inputs.word_ids(0), last_hidden_states
+        )
+
+        # Process word groups into final outputs
+        words, embeddings, indices = self._process_word_groups(word_groups, text)
+
+        return words, embeddings, indices
+
+    def _prepare_inputs(self, text):
+        """Tokenize text and prepare model inputs."""
+        return self.tokenizer(
             text,
             return_tensors="pt",
             return_offsets_mapping=True,
@@ -22,54 +49,55 @@ class Tokenizer:
             max_length=512,
         )
 
-        input_ids = inputs["input_ids"]
-        offset_mapping = inputs["offset_mapping"]
-        word_ids = inputs.word_ids(0)  # Word IDs for the first sequence
-
-        # Get last hidden states from the model
+    def _get_hidden_states(self, input_ids):
+        """Get last hidden states from the model."""
         with torch.no_grad():
             outputs = self.model(input_ids, output_hidden_states=True)
-            last_hidden_states = outputs.hidden_states[-1][
-                0
-            ]  # Shape: [seq_len, hidden_dim]
+            return outputs.hidden_states[-1][0]  # Shape: [seq_len, hidden_dim]
 
-        # Group tokens by word and compute average representations
-        words = []
-        embeddings = []
-        current_word_id = None
-        current_embeddings = []
-        current_start = None
-        current_end = None
+    def _group_tokens_by_word(self, offset_mapping, word_ids, hidden_states):
+        """Group tokens by their word IDs."""
+        word_groups = {}
 
         for idx, word_id in enumerate(word_ids):
-            if word_id is None:  # Skip special tokens (e.g., [CLS], [SEP])
+            if word_id is None:  # Skip special tokens
                 continue
 
-            start, end = offset_mapping[0][idx].tolist()
+            start, end = offset_mapping[idx].tolist()
 
-            if word_id == current_word_id:
-                # Continue accumulating tokens for the current word
-                current_embeddings.append(last_hidden_states[idx])
-                current_end = end  # Update word end position
-            else:
-                # Save previous word if exists
-                if current_word_id is not None:
-                    word_text = text[current_start:current_end]
-                    avg_embed = torch.mean(torch.stack(current_embeddings), dim=0)
-                    words.append(word_text)
-                    embeddings.append(avg_embed)
+            if word_id not in word_groups:
+                word_groups[word_id] = {"embeddings": [], "start": start, "end": end}
 
-                # Start new word
-                current_word_id = word_id
-                current_embeddings = [last_hidden_states[idx]]
-                current_start = start
-                current_end = end
+            word_groups[word_id]["embeddings"].append(hidden_states[idx])
+            word_groups[word_id]["end"] = end  # Update end position
 
-        # Add the last word
-        if current_word_id is not None:
-            word_text = text[current_start:current_end]
-            avg_embed = torch.mean(torch.stack(current_embeddings), dim=0)
+        return word_groups
+
+    def _process_word_groups(self, word_groups, text):
+        """Process grouped tokens into words, embeddings, and indices."""
+        words = []
+        embeddings = []
+        indices = []
+
+        # Sort by word_id to maintain order
+        for word_id in sorted(word_groups.keys()):
+            group = word_groups[word_id]
+
+            # Extract word text
+            start_idx = group["start"]
+            end_idx = group["end"]
+            word_text = text[start_idx:end_idx]
+
+            # Compute average embedding
+            avg_embedding = self._average_embeddings(group["embeddings"])
+
+            # Append to results
             words.append(word_text)
-            embeddings.append(avg_embed)
+            embeddings.append(avg_embedding)
+            indices.append((start_idx, end_idx))
 
-        return words, embeddings
+        return words, embeddings, indices
+
+    def _average_embeddings(self, embeddings_list):
+        """Compute average of a list of embedding tensors."""
+        return torch.mean(torch.stack(embeddings_list), dim=0)
