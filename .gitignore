@@ -178,7 +178,6 @@ cython_debug/
 .DS_Store
 
 *.pth
-*.pt
 *.ckpt
 *.pth.tar
 
