@@ -3,12 +3,12 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification
 
 
 class Tokenizer:
-    def __init__(self):
+    def __init__(self, model_name="saattrupdan/nbailab-base-ner-scandi"):
         self.tokenizer = AutoTokenizer.from_pretrained(
-            "saattrupdan/nbailab-base-ner-scandi"
+            model_name
         )
         self.model = AutoModelForTokenClassification.from_pretrained(
-            "saattrupdan/nbailab-base-ner-scandi"
+            model_name
         )
         self.model.eval()
 
@@ -35,9 +35,9 @@ class Tokenizer:
         )
 
         # Process word groups into final outputs
-        words, embeddings, indices = self._process_word_groups(word_groups, text)
+        words, embeddings = self._process_word_groups(word_groups, text)
 
-        return words, embeddings, indices
+        return words, embeddings
 
     def _prepare_inputs(self, text):
         """Tokenize text and prepare model inputs."""
@@ -74,10 +74,9 @@ class Tokenizer:
         return word_groups
 
     def _process_word_groups(self, word_groups, text):
-        """Process grouped tokens into words, embeddings, and indices."""
+        """Process grouped tokens into words, and embeddings."""
         words = []
         embeddings = []
-        indices = []
 
         # Sort by word_id to maintain order
         for word_id in sorted(word_groups.keys()):
@@ -94,9 +93,8 @@ class Tokenizer:
             # Append to results
             words.append(word_text)
             embeddings.append(avg_embedding)
-            indices.append((start_idx, end_idx))
 
-        return words, embeddings, indices
+        return words, embeddings
 
     def _average_embeddings(self, embeddings_list):
         """Compute average of a list of embedding tensors."""

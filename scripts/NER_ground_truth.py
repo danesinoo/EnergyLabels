@@ -79,7 +79,7 @@ def ner_data(file_name="data/data_district_heating.xlsx"):
     ground_truth["labels"] = pd.NA
 
     for i in trange(len(ground_truth)):
-        words, tokens, _ = tokenizer.tokenize(ground_truth.loc[i, "text"])
+        words, tokens = tokenizer.tokenize(ground_truth.loc[i, "text"])
         words = [word.lower() for word in words]
         ground_truth.at[i, "words"] = words
         ground_truth.at[i, "tokens"] = tokens
